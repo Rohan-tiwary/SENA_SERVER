@@ -10,7 +10,7 @@ const port = process.env.PORT || 4000;
 
 // CORS Middleware (Place at the top)
 app.use(cors({
-  origin: ["https://sena-client.vercel.app", "http://localhost:5173"],
+  origin: ["https://sena-client-eight.vercel.app", "http://localhost:5173"],
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true // Allow credentials
