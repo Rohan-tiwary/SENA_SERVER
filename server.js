@@ -2,18 +2,17 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
-import pool from "./config/mysql.js"; // Import MySQL connection
+import pool from "./config/mysql.js";
 
 dotenv.config();
 const app = express();
 const port = process.env.PORT || 4000;
 
-// CORS Middleware (Place at the top)
 app.use(cors({
   origin: ["https://sena-client-eight.vercel.app", "http://localhost:5173"],
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true // Allow credentials
+  credentials: true 
 }));
 
 // Handle preflight requests
