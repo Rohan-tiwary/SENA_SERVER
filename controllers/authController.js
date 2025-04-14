@@ -6,14 +6,11 @@ import axios from 'axios';
 
 export const register = async (req, res) => {
   const { name, email, password, role, captchaToken, specialCode } = req.body;
-  //console.log("Captcha API response:", captchaToken);
-  // Check for basic required fields
   if (!name || !email || !password || !captchaToken) {
    
     return res.status(400).json({ success: false, message: "Missing required details." });
   }
 
-  // Validate special code for roles
   if (["developer", "sponsor", "influencer"].includes(role)) {
     if (!specialCode) {
       return res.status(400).json({ success: false, message: "Special code is required for this role." });
