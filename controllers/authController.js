@@ -5,66 +5,75 @@ import pool from "../config/mysql.js";
 import axios from 'axios';
 
 export const register = async (req, res) => {
-  const { name, email, password ,role, captchaToken, specialCode } = req.body;
-
-  if (!name || !email || !password || !captchaToken || !specialCode) {
-    return res.json({ success: false, message: "Missing Details" });
+  const { name, email, password, role, captchaToken, specialCode } = req.body;
+  //console.log("Captcha API response:", captchaToken);
+  // Check for basic required fields
+  if (!name || !email || !password || !captchaToken) {
+   
+    return res.status(400).json({ success: false, message: "Missing required details." });
   }
 
+  // Validate special code for roles
   if (["developer", "sponsor", "influencer"].includes(role)) {
+    if (!specialCode) {
+      return res.status(400).json({ success: false, message: "Special code is required for this role." });
+    }
     const codeMap = JSON.parse(process.env.SPECIAL_CODE_MAP || '{}');
     const validCode = codeMap[role];
     if (!validCode || specialCode !== validCode) {
-      return res.status(401).json({ success: false, message: "Invalid access code" });
+      return res.status(401).json({ success: false, message: "Invalid access code." });
     }
   }
 
   try {
-    const googleVerifyUrl = `https://www.google.com/recaptcha/api/siteverify`;
-    const { data } = await axios.post(
-      googleVerifyUrl,
+    // Verify reCAPTCHA token
+    const { data: captchaResponse } = await axios.post(
+      `https://www.google.com/recaptcha/api/siteverify`,
       new URLSearchParams({
         secret: process.env.RECAPTCHA_SECRET_KEY,
         response: captchaToken,
       }).toString(),
-        {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        }
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      }
     );
 
-    if (!data.success) {
-      return res.json({
+    if (!captchaResponse.success) {
+      return res.status(400).json({
         success: false,
         message: "reCAPTCHA verification failed",
-        errorCodes:data["error-codes"],
+        errorCodes: captchaResponse["error-codes"],
       });
     }
-     // Check if user already exists
-    const [existingUser] = await pool.query('SELECT * FROM user WHERE email = ?',[email]);
-    if (existingUser.length > 0) {
-      return res.json({ success: false, message: "User already exists" });
+
+    // Check if user already exists
+    const [existingUsers] = await pool.query('SELECT * FROM user WHERE email = ?', [email]);
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ success: false, message: "User already exists." });
     }
 
-    // Hash the password
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert new user into database
-    const [result] = await pool.query('INSERT INTO user (name, email, password) VALUES (?, ?, ?)', [name, email, hashedPassword]);
+    // Insert user into DB
+    const [result] = await pool.query(
+      'INSERT INTO user (name, email, password) VALUES (?, ?, ?)',
+      [name, email, hashedPassword]
+    );
     const userId = result.insertId;
 
-    // Generate JWT token
-    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    // Generate JWT
+    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
+    // Set cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    // Sending welcome email
+    // Send welcome email
     const mailOptions = {
       from: process.env.SENDER_EMAIL,
       to: email,
@@ -88,16 +97,18 @@ export const register = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    return res.json({ success: true, token });
+    return res.status(201).json({ success: true, token });
+
   } catch (error) {
-    console.error(error);
-    res.json({ success: false, message: error.message });
+    console.error("Registration Error:", error);
+    return res.status(500).json({ success: false, message: "Server error. Please try again later." });
   }
 };
+
 //login functionality
 export const login = async (req, res) => {
   const { email, password , captchaToken , role , specialCode } = req.body;
-
+  console.log("Received Data:", {email, password, captchaToken, role, specialCode });
   if (!email || !password || !captchaToken || !specialCode || !role ) {
     return res.json({
       success: false,
