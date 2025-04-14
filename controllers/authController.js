@@ -1,17 +1,45 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import transporter from "../config/nodemailer.js";
-import pool from "../config/mysql.js"
-//registaration form
-export const register = async (req, res) => {
-  const { name, email, password } = req.body;
+import pool from "../config/mysql.js";
+import axios from 'axios';
 
-  if (!name || !email || !password) {
+export const register = async (req, res) => {
+  const { name, email, password ,role, captchaToken, specialCode } = req.body;
+
+  if (!name || !email || !password || !captchaToken || !specialCode) {
     return res.json({ success: false, message: "Missing Details" });
   }
 
+  if (["developer", "sponsor", "influencer"].includes(role)) {
+    const codeMap = JSON.parse(process.env.SPECIAL_CODE_MAP || '{}');
+    const validCode = codeMap[role];
+    if (!validCode || specialCode !== validCode) {
+      return res.status(401).json({ success: false, message: "Invalid access code" });
+    }
+  }
+
   try {
-    // Check if user already exists
+    const googleVerifyUrl = `https://www.google.com/recaptcha/api/siteverify`;
+    const { data } = await axios.post(
+      googleVerifyUrl,
+      new URLSearchParams({
+        secret: process.env.RECAPTCHA_SECRET_KEY,
+        response: captchaToken,
+      }).toString(),
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }
+    );
+
+    if (!data.success) {
+      return res.json({
+        success: false,
+        message: "reCAPTCHA verification failed",
+        errorCodes:data["error-codes"],
+      });
+    }
+     // Check if user already exists
     const [existingUser] = await pool.query('SELECT * FROM user WHERE email = ?',[email]);
     if (existingUser.length > 0) {
       return res.json({ success: false, message: "User already exists" });
@@ -66,20 +94,46 @@ export const register = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
-
 //login functionality
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password , captchaToken , role , specialCode } = req.body;
 
-  if (!email || !password) {
+  if (!email || !password || !captchaToken || !specialCode || !role ) {
     return res.json({
       success: false,
-      message: 'Email and password are required',
+      message: 'Email , password and captcha are required',
     });
   }
 
+  if (["developer", "sponsor", "influencer"].includes(role)) {
+    const codeMap = JSON.parse(process.env.SPECIAL_CODE_MAP || '{}');
+    const validCode = codeMap[role];
+    if (!validCode || specialCode !== validCode) {
+      return res.status(401).json({ success: false, message: "Invalid access code" });
+    }
+  }
+
   try {
-    // SQL query to find the user by email
+    const googleVerifyUrl = `https://www.google.com/recaptcha/api/siteverify`;
+    const { data } = await axios.post(
+      googleVerifyUrl,
+      new URLSearchParams({
+        secret: process.env.RECAPTCHA_SECRET_KEY,
+        response: captchaToken,
+      }).toString(),
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }
+    );
+
+    if (!data.success) {
+      return res.json({
+        success: false,
+        message: "reCAPTCHA verification failed",
+        errorCodes:data["error-codes"],
+      });
+    }
+
     const query = 'SELECT * FROM user WHERE email = ?';
     const [results] = await pool.query(query, [email]);
 
@@ -89,19 +143,16 @@ export const login = async (req, res) => {
 
     const user = results[0];
 
-    // Compare the password with the hashed password stored in the database
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.json({ success: false, message: 'Invalid password' });
     }
 
-    // Create JWT token
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: '7d',
     });
 
-    // Set token in cookies
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -135,7 +186,6 @@ export const logout = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
-
 //send verification OTP
 export const sendVerifyOtp = async (req, res) => {
   try {
@@ -232,7 +282,6 @@ export const verifyEmail = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
-
 //check if user is authenticated
 export const isAuthenticated = async (req, res) => {
   try {
@@ -254,8 +303,7 @@ export const isAuthenticated = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
-
-//send password Reset otp//error phase due to datatype error
+//send password Reset otp
 export const sendResetOtp = async (req, res) => {
   const { email } = req.body;
 
