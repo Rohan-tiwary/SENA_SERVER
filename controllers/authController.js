@@ -34,19 +34,21 @@ export const register = async (req, res) => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       }
     );
-    captchaResponse.success = true;
-    // if (!captchaResponse.success) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "reCAPTCHA verification failed",
-    //     errorCodes: captchaResponse["error-codes"],
-    //   });
-    // }
+    if (!captchaResponse.success) {
+      return res.status(400).json({
+        success: false,
+        message: "reCAPTCHA verification failed",
+        errorCodes: captchaResponse["error-codes"],
+      });
+    }
 
     // Check if user already exists
     const [existingUsers] = await pool.query('SELECT * FROM user WHERE email = ?', [email]);
     if (existingUsers.length > 0) {
-      return res.status(409).json({ success: false, message: "User already exists." });
+      return res.status(409).json({
+        success: false,
+        message: "The email you entered is already registered. Please log in or use a different email address."
+      });
     }
 
     // Hash password
