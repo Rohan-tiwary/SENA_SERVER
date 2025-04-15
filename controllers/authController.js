@@ -65,7 +65,7 @@ export const register = async (req, res) => {
     // Set cookie
     res.cookie("token", token, {
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite:"none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -105,7 +105,7 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   const { email, password , captchaToken , role , specialCode } = req.body;
   console.log("Received Data:", {email, password, captchaToken, role, specialCode });
-  if (!email || !password || !captchaToken || !specialCode || !role ) {
+  if (!email || !password || !role ) {
     return res.json({
       success: false,
       message: 'Email , password and captcha are required',
