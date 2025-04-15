@@ -34,6 +34,7 @@ export const register = async (req, res) => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       }
     );
+
     if (!captchaResponse.success) {
       return res.status(400).json({
         success: false,
@@ -45,10 +46,7 @@ export const register = async (req, res) => {
     // Check if user already exists
     const [existingUsers] = await pool.query('SELECT * FROM user WHERE email = ?', [email]);
     if (existingUsers.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: "The email you entered is already registered. Please log in or use a different email address."
-      });
+      return res.status(409).json({ success: false, message: "User already exists." });
     }
 
     // Hash password
@@ -67,7 +65,7 @@ export const register = async (req, res) => {
     // Set cookie
     res.cookie("token", token, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       sameSite:"none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
