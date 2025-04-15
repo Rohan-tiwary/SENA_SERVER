@@ -6,8 +6,8 @@ import axios from 'axios';
 
 export const register = async (req, res) => {
   const { name, email, password, role, captchaToken, specialCode } = req.body;
+
   if (!name || !email || !password || !captchaToken) {
-   
     return res.status(400).json({ success: false, message: "Missing required details." });
   }
 
@@ -67,7 +67,7 @@ export const register = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     // Send welcome email
@@ -101,7 +101,6 @@ export const register = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error. Please try again later." });
   }
 };
-
 //login functionality
 export const login = async (req, res) => {
   const { email, password , captchaToken , role , specialCode } = req.body;
